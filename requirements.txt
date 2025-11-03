@@ -1,0 +1,8 @@
+scanpy 
+scikit-learn
+matplotlib
+igraph
+leidenalg
+tabulate
+kneed
+torch
