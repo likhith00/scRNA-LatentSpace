@@ -6,3 +6,4 @@ leidenalg
 tabulate
 kneed
 torch
+torchvision
