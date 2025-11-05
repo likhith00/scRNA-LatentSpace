@@ -2,12 +2,22 @@
 __pycache__/
 *.py[codz]
 *$py.class
+*.pt
+*.pth
+*.bin
+*.ckpt
+*.safetensors
 
 # C extensions
 *.so
 
 # folders
 data/
+outputs/run_*/
+!outputs/run_*/summary_train.json
+!outputs/run_*/summary_eval.json
+outputs/run_*/ae_latent*/
+!outputs/run_*/
 
 # Distribution / packaging
 .Python

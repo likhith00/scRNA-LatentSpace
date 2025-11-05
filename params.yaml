@@ -1,6 +1,6 @@
 activation: relu
 ae_type: ae
-epochs: 1
+epochs: 5
 batch_size: 256
 latent_dims:
 - 2

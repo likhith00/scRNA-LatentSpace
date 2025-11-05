@@ -152,7 +152,6 @@ def train_many(train_loader,
     return summaries
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--params", default="params.yaml")
