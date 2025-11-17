@@ -12,6 +12,44 @@ except Exception:
     HAVE_UMAP = False
 
 
+def _find_elbow_from_curve(dims, loss_vals) -> int:
+    """
+    dims: list of latent dimensions (sorted)
+    loss_vals: list of losses aligned with dims
+    Returns the dim at the 'elbow' using the max-distance-to-chord heuristic.
+    """
+    if len(dims) <= 2:
+        # Not enough points for a real elbow; fall back to smallest loss
+        min_idx = int(np.argmin(loss_vals))
+        return dims[min_idx]
+
+    xs = np.array(dims, dtype=float)
+    ys = np.array(loss_vals, dtype=float)
+
+    # Normalize to [0, 1] for stability
+    xs_n = (xs - xs.min()) / (xs.max() - xs.min() + 1e-8)
+    ys_n = (ys - ys.min()) / (ys.max() - ys.min() + 1e-8)
+
+    p1 = np.array([xs_n[0], ys_n[0]])
+    p2 = np.array([xs_n[-1], ys_n[-1]])
+    line_vec = p2 - p1
+    line_len = np.linalg.norm(line_vec)
+    if line_len < 1e-8:
+        # Degenerate case: curve almost flat
+        min_idx = int(np.argmin(loss_vals))
+        return dims[min_idx]
+
+    line_unit = line_vec / line_len
+    pts = np.stack([xs_n, ys_n], axis=1)
+    v = pts - p1
+    proj_len = v @ line_unit
+    proj_pts = p1 + np.outer(proj_len, line_unit)
+    dists = np.linalg.norm(pts - proj_pts, axis=1)
+
+    elbow_idx = int(np.argmax(dists))
+    return dims[elbow_idx]
+
+
 class AEVisualizer:
     """
     Visualization-only helper. Reads existing artifacts from a run directory:
@@ -110,13 +148,30 @@ class AEVisualizer:
         test_losses = {int(k): float(v) for k, v in test_losses.items()}
         dims = sorted(test_losses.keys())
         vals = [test_losses[d] for d in dims]
+
+        # --- compute elbow dim from loss curve ---
+        best_dim = _find_elbow_from_curve(dims, vals)
+
         plt.figure(figsize=(6,4))
-        plt.plot(dims, vals, marker="o")
-        plt.xlabel("Latent dimension"); plt.ylabel("Reconstruction loss")
-        plt.title("Test loss vs latent dimension")
-        plt.grid(True); plt.tight_layout()
+        plt.plot(dims, vals, marker="o", label="loss")
+
+        # mark elbow on the curve
+        if best_dim in dims:
+            idx = dims.index(best_dim)
+            elbow_loss = vals[idx]
+            plt.scatter([best_dim], [elbow_loss],
+                        marker="*", s=100, zorder=5, label=f"elbow d={best_dim}")
+            plt.axvline(best_dim, linestyle=":", alpha=0.7)
+
+        plt.xlabel("Latent dimension")
+        plt.ylabel("Reconstruction loss")
+        plt.title(f"Test loss vs latent dimension (elbow d={best_dim})")
+        plt.grid(True)
+        plt.legend()
+        plt.tight_layout()
         plt.savefig(self.run_dir / "loss_vs_latent_dim.png", dpi=150)
         plt.close()
+
 
     def plot_umap_if_available(self, d: int) -> None:
         if not self.enable_umap:
@@ -126,8 +181,7 @@ class AEVisualizer:
             return
         latents = self._load_cached_latents(d)
         if latents is None:
-            print(f"[info] no cached latents for d={d}; 
-                  expected latents_d{d}.npz or Z.npy/y.npy. Skipping UMAP.")
+            print(f"[info] no cached latents for d={d}; expected latents_d{d}.npz or Z.npy/y.npy. Skipping UMAP.")
             return
         Z, y = latents
         reducer = umap.UMAP(n_components=2, n_neighbors=15, min_dist=0.1, random_state=42)

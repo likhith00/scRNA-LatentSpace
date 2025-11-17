@@ -52,10 +52,10 @@ class DataLoaderFactory:
         valid_ds = TensorDataset(torch.from_numpy(Xte), torch.from_numpy(yte))
 
         train_loader = DataLoader(train_ds, 
-                                  batch_size=self.batch_size, 
+                                  batch_size=self.batch_size,
                                   shuffle=True)
         valid_loader = DataLoader(valid_ds, 
-                                  batch_size=self.batch_size, 
+                                  batch_size=self.batch_size,
                                   shuffle=False)
         return train_loader, valid_loader
 

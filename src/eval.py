@@ -109,9 +109,11 @@ if __name__ == "__main__":
 
     params = load_params(args.params)
     run_dir = Path(args.run_dir)
+    dataset = args.dataset
+
     factory = DataLoaderFactory(params)
 
-    train_loader, valid_loader = factory.build("mnist")
+    train_loader, valid_loader = factory.build(dataset=dataset)
     # Load models
     input_dim = infer_input_dim(valid_loader)
     models = load_models_for_run(params, input_dim, run_dir)
