@@ -192,16 +192,107 @@ class AEVisualizer:
         cbar.set_label("Label")
         plt.xlabel("UMAP-1"); plt.ylabel("UMAP-2"); plt.title(f"UMAP (d={d})");
 
-        plt.tight_layout();
+        plt.tight_layout()
         plt.savefig(self._latent_dir(d) / "latent_umap_scatter.png", dpi=150);
-        plt.close();
+        plt.close()
+    
+    def plot_cluster_indices_vs_dim(self):
+        """
+        Plot CH, Silhouette, DB, trustworthiness, continuity vs latent dimension.
+        """
+        summary = self._read_summary()
+        if "cluster_metrics" not in summary:
+            print("[WARN] No cluster_metrics in summary_eval.json, skipping cluster index plots.")
+            return
+
+        cm = summary["cluster_metrics"]
+        dims = sorted(int(d) for d in cm.keys())
+
+        ch_vals = [cm[str(d)]["calinski_harabasz"] for d in dims]
+        sil_vals = [cm[str(d)]["silhouette"] for d in dims]
+        db_vals = [cm[str(d)]["davies_bouldin"] for d in dims]
+        trust_vals = [cm[str(d)]["trustworthiness"] for d in dims]
+        cont_vals = [cm[str(d)]["continuity"] for d in dims]
+
+        # 1) CH
+        plt.figure()
+        plt.plot(dims, ch_vals, marker="o")
+        best_ch_dim = dims[int(np.argmax(ch_vals))]
+        plt.axvline(best_ch_dim, linestyle="--")
+        plt.title("Calinski–Harabasz vs latent dim")
+        plt.xlabel("latent dim")
+        plt.ylabel("CH index")
+        plt.savefig(self.run_dir / "ch_vs_latent_dim.png")
+        plt.close()
+
+        # 2) Silhouette
+        plt.figure()
+        plt.plot(dims, sil_vals, marker="o")
+        best_sil_dim = dims[int(np.argmax(sil_vals))]
+        plt.axvline(best_sil_dim, linestyle="--")
+        plt.title("Silhouette vs latent dim")
+        plt.xlabel("latent dim")
+        plt.ylabel("Silhouette")
+        plt.savefig(self.run_dir / "silhouette_vs_latent_dim.png")
+        plt.close()
+
+        # 3) DB (lower is better)
+        plt.figure()
+        plt.plot(dims, db_vals, marker="o")
+        best_db_dim = dims[int(np.argmin(db_vals))]
+        plt.axvline(best_db_dim, linestyle="--")
+        plt.title("Davies–Bouldin vs latent dim")
+        plt.xlabel("latent dim")
+        plt.ylabel("DB index (lower=better)")
+        plt.savefig(self.run_dir / "db_vs_latent_dim.png")
+        plt.close()
+
+        # 4) Trustworthiness / Continuity
+        plt.figure()
+        plt.plot(dims, trust_vals, marker="o", label="trustworthiness")
+        plt.plot(dims, cont_vals, marker="s", label="continuity")
+        plt.legend()
+        plt.xlabel("latent dim")
+        plt.ylabel("score")
+        plt.title("Neighborhood metrics vs latent dim")
+        plt.savefig(self.run_dir / "neighborhood_vs_latent_dim.png")
+        plt.close()
+
+        print("[INFO] Saved CH/Silhouette/DB/trustworthiness/continuity vs latent dim plots.")
+
 
     def run(self, latent_dims: List[int]) -> None:
         for d in sorted(int(x) for x in latent_dims):
             self.plot_training_curves(d)
+            self.plot_correlation_heatmap(d)
             self.plot_umap_if_available(d)
         self.plot_loss_vs_dim()
+        self.plot_cluster_indices_vs_dim()
         print(f"[done] saved visualizations to: {self.run_dir}")
+    
+    def plot_correlation_heatmap(self, d):
+        """
+        Plot correlation heatmap of latent dimensions for a given d.
+        Requires ae_latent{d}/corr.npy.
+        """
+        corr_path = self._latent_dir(d) / "corr.npy"
+        if not corr_path.exists():
+            print(f"[WARN] No corr.npy for latent={d}, skipping heatmap.")
+            return
+
+        corr = np.load(corr_path)
+        plt.figure(figsize=(6, 5))
+        im = plt.imshow(corr, vmin=-1, vmax=1)
+        plt.colorbar(im)
+        plt.title(f"Latent correlation heatmap (d={d})")
+        plt.xlabel("Latent dim")
+        plt.ylabel("Latent dim")
+        out_path = self._latent_dir(d) / "corr_heatmap.png"
+        plt.tight_layout()
+        plt.savefig(out_path)
+        plt.close()
+        print(f"[INFO] Saved correlation heatmap to {out_path}")
+
 
 
 def _find_latest_run_dir(base: Path) -> Optional[Path]:

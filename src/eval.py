@@ -195,6 +195,8 @@ def evaluate_all(models, loader, params: Dict, run_dir: Path):
         sil = silhouette_score(Z, y_pred, metric="euclidean")
         db = davies_bouldin_score(Z, y_pred)
         ch = calinski_harabasz_score(Z, y_pred)
+        corr, red_metrics = compute_latent_correlation_and_redundancy(Z)
+        np.save(latent_dir / "corr.npy", corr)
 
         cluster_metrics[d] = {
             "ARI": float(ari),
@@ -204,6 +206,8 @@ def evaluate_all(models, loader, params: Dict, run_dir: Path):
             "silhouette": float(sil),
             "davies_bouldin": float(db),
             "calinski_harabasz": float(ch),
+            "avg_abs_corr": red_metrics["avg_abs_corr"],
+            "effective_dim_95var": red_metrics["effective_dim_95var"],
         }
 
         print(f"  latent_dim={d}: loss={loss:.4f}, ARI={ari:.4f}, NMI={nmi:.4f}, Trustworthiness={t:.4f}, Continuity={c:.4f}, Silhouette={sil:.4f}, DB={db:.4f}, CH={ch:.4f}")
@@ -220,6 +224,33 @@ def evaluate_all(models, loader, params: Dict, run_dir: Path):
     )
     print(f"\nSaved everything to: {run_dir}")
 
+def compute_latent_correlation_and_redundancy(Z):
+    """
+    Z: (n_samples, d)
+    Returns:
+      corr: (d, d) correlation matrix
+      metrics: dict with simple redundancy measures
+    """
+    import numpy as np
+    from sklearn.decomposition import PCA
+
+    # d x d correlation between latent dimensions
+    corr = np.corrcoef(Z, rowvar=False)
+
+    # average absolute off-diagonal correlation
+    off_diag = np.abs(corr[np.triu_indices_from(corr, k=1)])
+    avg_abs_corr = float(off_diag.mean()) if off_diag.size > 0 else 0.0
+
+    # effective dimensionality via PCA (95% explained variance)
+    pca = PCA().fit(Z)
+    cumulative = np.cumsum(pca.explained_variance_ratio_)
+    eff_dim = int(np.searchsorted(cumulative, 0.95) + 1)
+
+    metrics = {
+        "avg_abs_corr": avg_abs_corr,
+        "effective_dim_95var": eff_dim,
+    }
+    return corr, metrics
 
 if __name__ == "__main__":
 
