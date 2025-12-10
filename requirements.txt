@@ -7,3 +7,4 @@ tabulate
 kneed
 torch
 torchvision
+packaging

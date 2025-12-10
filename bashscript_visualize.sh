@@ -8,4 +8,4 @@
 
 unset SLURM_EXPORT_ENV
 
-python src/train.py --params "params.yaml" --dataset "digits"
+python src/visualize.py --run-dir outputs/run_a60de80 --umap
