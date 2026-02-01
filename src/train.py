@@ -156,15 +156,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--params", default="params.yaml")
     parser.add_argument("--dataset",
-                        choices=["mnist", "digits"],
+                        choices=["mnist", "digits", "fashion_mnist",
+                                 "emnist_balanced"],
                         default="mnist")
- 
+    
     args = parser.parse_args()
-
+    print(args.dataset)
     params = load_params(args.params)
     factory = DataLoaderFactory(params)
 
-    train_loader, valid_loader = factory.build("mnist")
+    train_loader, valid_loader = factory.build(args.dataset)
     print(f"Number of training batches: {len(train_loader)}")
     print(f"Number of validation batches: {len(valid_loader)}")
 

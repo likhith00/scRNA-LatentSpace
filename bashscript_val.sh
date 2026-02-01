@@ -10,4 +10,4 @@ unset SLURM_EXPORT_ENV
 
 source .venv/bin/activate
 
-python src/eval.py --params "params.yaml" --dataset "mnist" --run-dir outputs/run_a60de80
+python src/eval.py --params "params.yaml" --dataset "digits" --run-dir outputs/run_fae4cd8

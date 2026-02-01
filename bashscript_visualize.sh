@@ -8,4 +8,7 @@
 
 unset SLURM_EXPORT_ENV
 
-python src/visualize.py --run-dir outputs/run_a60de80 --umap
+
+source .venv/bin/activate
+
+python src/visualize.py --run-dir outputs/run_fae4cd8 --umap
