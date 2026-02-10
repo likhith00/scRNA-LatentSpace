@@ -157,7 +157,7 @@ if __name__ == "__main__":
     parser.add_argument("--params", default="params.yaml")
     parser.add_argument("--dataset",
                         choices=["mnist", "digits", "fashion_mnist",
-                                 "emnist_balanced"],
+                                 "emnist_balanced", "blobs", "uci_har", "gtsrb"],
                         default="mnist")
     
     args = parser.parse_args()

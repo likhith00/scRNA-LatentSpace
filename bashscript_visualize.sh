@@ -11,4 +11,4 @@ unset SLURM_EXPORT_ENV
 
 source .venv/bin/activate
 
-python src/visualize.py --run-dir outputs/run_fae4cd8 --umap
+python src/visualize.py --run-dir outputs/run_3fea39b --umap

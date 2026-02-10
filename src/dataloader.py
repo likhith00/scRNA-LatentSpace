@@ -4,7 +4,9 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 from torchvision import datasets, transforms
-
+import os
+import urllib.request
+import zipfile
 from sklearn.datasets import load_digits, make_blobs
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -135,6 +137,172 @@ class DataLoaderFactory:
         train_ds = TensorDataset(torch.from_numpy(Xtr), torch.from_numpy(ytr))
         valid_ds = TensorDataset(torch.from_numpy(Xte), torch.from_numpy(yte))
         return self._wrap_loaders(train_ds, valid_ds)
+    
+    def build_uci_har_loaders(self):
+        """
+        UCI HAR:
+        - downloads and extracts the dataset under dataset_cfg.uci_har.root
+        - robustly finds the extracted folder that contains train/X_train.txt
+        - loads X_train/y_train and X_test/y_test
+        - StandardScaler fit on train, applied to test
+        - labels converted from 1..6 to 0..5
+        """
+        import os
+        import urllib.request
+        import zipfile
+        import numpy as np
+        import torch
+        from torch.utils.data import DataLoader, TensorDataset
+        from sklearn.preprocessing import StandardScaler
+
+        cfg = self.params.get("dataset_cfg", {}).get("uci_har", {})
+        data_root = cfg.get("root", "./data/uci_har")
+
+        # Prefer the *direct* dataset zip; still works if user overrides url to the "bundle" zip.
+        url = cfg.get(
+            "url",
+            "https://archive.ics.uci.edu/ml/machine-learning-databases/00240/UCI%20HAR%20Dataset.zip",
+        )
+
+        os.makedirs(data_root, exist_ok=True)
+        zip_path = os.path.join(data_root, os.path.basename(url) or "uci_har.zip")
+
+        def find_uci_har_root(base_dir: str):
+            """
+            Return directory that contains:
+            train/X_train.txt and test/X_test.txt
+            Typically: <base_dir>/UCI HAR Dataset/
+            """
+            for root, dirs, files in os.walk(base_dir):
+                if "train" in dirs and "test" in dirs:
+                    if (
+                        os.path.exists(os.path.join(root, "train", "X_train.txt"))
+                        and os.path.exists(os.path.join(root, "test", "X_test.txt"))
+                    ):
+                        return root
+            return None
+
+        def extract_zip(zip_file: str, dst_dir: str):
+            with zipfile.ZipFile(zip_file, "r") as zf:
+                zf.extractall(dst_dir)
+
+        # 1) If already extracted somewhere under data_root, use it.
+        extracted_root = find_uci_har_root(data_root)
+
+        # 2) If not found, download + extract.
+        if extracted_root is None:
+            if not os.path.exists(zip_path):
+                print(f"[INFO] Downloading UCI HAR zip to: {zip_path}")
+                urllib.request.urlretrieve(url, zip_path)
+
+            print(f"[INFO] Extracting zip into: {data_root}")
+            extract_zip(zip_path, data_root)
+
+            # 2b) Handle the common nested-zip case (your current situation):
+            #     outer zip extracts "UCI HAR Dataset.zip" which then contains "UCI HAR Dataset/train/..."
+            inner_zip = os.path.join(data_root, "UCI HAR Dataset.zip")
+            if os.path.exists(inner_zip):
+                print(f"[INFO] Found nested zip, extracting: {inner_zip}")
+                extract_zip(inner_zip, data_root)
+
+            extracted_root = find_uci_har_root(data_root)
+
+        if extracted_root is None:
+            top = []
+            try:
+                top = os.listdir(data_root)
+            except Exception:
+                pass
+            raise FileNotFoundError(
+                "UCI HAR files not found after download/extract.\n"
+                f"Looked for train/X_train.txt under: {data_root}\n"
+                f"Top-level entries under root: {top}\n"
+                "Expected to find a folder containing train/ and test/ with X_train.txt."
+            )
+
+        print(f"[INFO] Using UCI HAR root: {extracted_root}")
+
+        def load_split(split: str):
+            X_path = os.path.join(extracted_root, split, f"X_{split}.txt")
+            y_path = os.path.join(extracted_root, split, f"y_{split}.txt")
+            X = np.loadtxt(X_path).astype("float32")
+            y = np.loadtxt(y_path).astype("int64") - 1  # 1..6 -> 0..5
+            return X, y
+
+        Xtr, ytr = load_split("train")
+        Xte, yte = load_split("test")
+
+        scaler = StandardScaler()
+        Xtr = scaler.fit_transform(Xtr).astype("float32")
+        Xte = scaler.transform(Xte).astype("float32")
+
+        train_ds = TensorDataset(torch.from_numpy(Xtr), torch.from_numpy(ytr))
+        valid_ds = TensorDataset(torch.from_numpy(Xte), torch.from_numpy(yte))
+
+        train_loader = DataLoader(
+            train_ds,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+            pin_memory=True,
+        )
+        valid_loader = DataLoader(
+            valid_ds,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=True,
+        )
+        return train_loader, valid_loader
+
+
+    def build_gtsrb_loaders(self) -> Tuple[DataLoader, DataLoader]:
+        """
+        GTSRB (German Traffic Sign Recognition Benchmark)
+        - images have varying sizes -> we resize to a fixed resolution
+        - RGB images
+        """
+        cfg = self.params.get("dataset_cfg", {}).get("gtsrb", {})
+
+        img_size = int(cfg.get("img_size", 32))  # 32 is a good default
+        # Simple normalization (ImageNet-like is also fine); this is baseline-safe
+        mean = cfg.get("mean", (0.5, 0.5, 0.5))
+        std = cfg.get("std", (0.5, 0.5, 0.5))
+
+        gtsrb_transform = transforms.Compose([
+            transforms.Resize((img_size, img_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std),
+        ])
+
+        train_ds = datasets.GTSRB(
+            root="./data",
+            split="train",
+            download=True,
+            transform=gtsrb_transform,
+        )
+        test_ds = datasets.GTSRB(
+            root="./data",
+            split="test",
+            download=True,
+            transform=gtsrb_transform,
+        )
+
+        train_loader = DataLoader(
+            train_ds,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+            pin_memory=True,
+        )
+        valid_loader = DataLoader(
+            test_ds,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=True,
+        )
+        return train_loader, valid_loader
 
     # -------------------------
     # Utilities
@@ -169,8 +337,12 @@ class DataLoaderFactory:
             return self.build_digits_loaders()
         if dataset == "blobs":
             return self.build_blobs_loaders()
+        if dataset in ("uci_har", "har", "uci"):
+            return self.build_uci_har_loaders()
+        if dataset in ("gtsrb", "traffic_signs", "traffic-signs"):
+            return self.build_gtsrb_loaders()
 
         raise ValueError(
             f"Unknown dataset: {dataset}. "
-            "Supported: mnist, fashion_mnist, emnist_balanced, digits, blobs"
+            "Supported: mnist, fashion_mnist, emnist_balanced, digits, blobs, gtsrb"
         )

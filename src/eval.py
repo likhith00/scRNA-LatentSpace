@@ -256,7 +256,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--params", default="params.yaml")
-    parser.add_argument("--dataset", choices=["mnist", "digits","fashion_mnist","emnist_balanced"],
+    parser.add_argument("--dataset", choices=["mnist", "digits","fashion_mnist","emnist_balanced","uci_har", "gtsrb"],
                         default="mnist")
     parser.add_argument("--run-dir")
 
