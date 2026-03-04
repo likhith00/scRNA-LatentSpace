@@ -53,10 +53,13 @@ scRNA-LatentSpace/
 
 - GTSRB (German Traffic Sign Recognition Benchmark)
 
+Follow these steps in windows
 # Installation
 ```
 git clone https://github.com/likhith00/scRNA-LatentSpace.git
 cd scRNA-LatentSpace
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
