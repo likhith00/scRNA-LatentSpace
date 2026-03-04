@@ -53,8 +53,6 @@ scRNA-LatentSpace/
 
 - GTSRB (German Traffic Sign Recognition Benchmark)
 
-- UCI HAR (Human Activity Recognition)
-
 # Installation
 ```
 git clone https://github.com/likhith00/scRNA-LatentSpace.git
@@ -66,12 +64,12 @@ pip install -r requirements.txt
 # Running Experiments 
 ## Train autoencoders
 ```
-python src/train.py --dataset mnist
+python src/train.py --dataset digits
 ```
 
 ## Evaluate trained models
 ```
-python src/eval.py --dataset mnist --run-dir outputs/run_xxxxxxx
+python src/eval.py --dataset digits --run-dir outputs/run_xxxxxxx
 ```
 
 ## Visualize results
